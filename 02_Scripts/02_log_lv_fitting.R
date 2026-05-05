@@ -25,4 +25,32 @@ pruebafunc <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
                            niterations = 1500, nchains = 3, rvalin = 0.3, kvalin = 0.8, sigma_val = 0.05)
 
-rk_valslist_wtCH29 <- saveRDS(pruebafunc, file = "03_Output/stan_func_rk_vectors")
+saveRDS(pruebafunc, file = "03_Output/stan_func_rk_vectors")
+
+
+### Is it doing it right? 
+pruebita <- indv_gro %>% 
+  filter(Cepa == "CH29", # filter each strain 
+         temp == 30) %>%  # filter by temp 
+  arrange(ord_replica)     # arrange by the number of replica 
+
+# subset/split the data.frame by replica 
+replica_list <- split(pruebita, pruebita$ord_replica) 
+
+# create the time and obs vectors 
+tflat <- unlist(lapply(replica_list, function(x) x$hr))
+
+obsflat <- unlist(lapply(replica_list, function(x) x$OD_real)) 
+
+
+# generate the stan_data that's going to be used in the stan function 
+dtt <- list(
+  S = length(replica_list), # number of replicas 
+  totalobs = length(obsflat),  # total of observations 
+  sizes = as.array(sapply(replica_list, nrow)), # size of each replica 
+  y_time = tflat, 
+  y_obs = obsflat, 
+  sigma = 0.05
+)
+
+dtt

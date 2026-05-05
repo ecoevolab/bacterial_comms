@@ -3,11 +3,9 @@
 
 # Stan functions ---------------------------------------------------------------
 
-# 1. Initial values standarized 
-
-
 # Stan function for logistic LV model fitting 
 # Available in the 02_Scripts folder 
+# source = https://mc-stan.org/docs/2_26/functions-reference/slicing-and-blocking-functions.html
 
 # For standarized initial values 
 # Stan function with the Log LV model 
