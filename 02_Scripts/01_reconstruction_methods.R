@@ -26,7 +26,6 @@ rz_communities <- community_isolation(rcommunities = comms_rhiz , sample = temps
     
 rz_communities # List with all the communities and their respective composition/abundances 
 
-
 ##### Testing network inference algortihms -----------------------------------------
 
 #### SPARCc ------------------------------------------------------------------------

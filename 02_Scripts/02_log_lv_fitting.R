@@ -38,7 +38,7 @@ pruebafunc <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_
 
 # CHECKING ONE BY ONE CODE (STAN VS OD SAMPLING)
 # rmean & kmean specific for each list in the outputs list 
-# change the CH23_T30 for the replica you want to plot 
+# change the following $0CH23_T30 for the replica you want to plot 
 
 rmean <- summary(stan_toutputs$CH23_T42)$summary["r", "mean"]
 kmean  <- summary(stan_toutputs$CH23_T42)$summary["k", "mean"]

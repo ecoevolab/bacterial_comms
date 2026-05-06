@@ -3,12 +3,7 @@
 
 # Stan functions ---------------------------------------------------------------
 
-# Stan function for logistic LV model fitting 
-# Available in the 02_Scripts folder 
-# source = https://mc-stan.org/docs/2_26/functions-reference/slicing-and-blocking-functions.html
-
-# For standarized initial values 
-# Stan function with the Log LV model 
+# 1. Stan function with the Log LV model 
 stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col, niterations, nchains, rvalin, kvalin, sigma_val){
   
   # Assigning objects to specific values in the data.frame 
@@ -75,7 +70,7 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
 }
 
 
-# logistic growth (deSolve) / testing stan model 
+# 2. logistic growth (deSolve) / for testing stan model
 logistic_eq <- function(t, state, parameters){
   with(as.list(c(state, parameters)), {
     dz <- r * z * (1 - z / k)
@@ -86,7 +81,7 @@ logistic_eq <- function(t, state, parameters){
 
 # Growth curves ---------------------------------------------------------------
 
-# To get each growth curve in the cc database - one per temperature/strain 
+# 3. Get each growth curve (cuatro cienegas)
 growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, interest_column, replica_col){
   
   strains <- sort(unique(df[[strain_col]]), decreasing = F)
@@ -120,8 +115,8 @@ growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, inter
   return(plot_list)
 }
 
-# COMPARISON BETWEEN STAN MODEL CURVE & THE REAL DATA SAMLING FUNCION 
 
+# 4. Compare stan results vs the actual growth curves 
 stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, temp_col, interest_col){
   
   library(ggplot2)
@@ -175,7 +170,7 @@ stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, te
 }
 
 
-# get real od function ---------------------------------------------------------
+# 5. Creates a list of matrix with every OD_real value (separated by strain and temperature)
 get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
   
   # assigning objects to specific values in the data.frame 
@@ -220,8 +215,7 @@ get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, inter
 }
 # Reconstruction methods -------------------------------------------------------
 
-# Community isolation 
-# to get the 12 communities for each temperature 
+# 6. Get each community abundances (separated by temperature) 
 
 community_isolation <- function(rcommunities, sample, sample_col, rcommunities_col, df, arrangev, interest_column, dfwvals, composition_df){
   
@@ -285,7 +279,7 @@ community_isolation <- function(rcommunities, sample, sample_col, rcommunities_c
   
 }
 
-# Sparcc for multiple commuinities  - used for testing 
+# 7. Sparcc for multiple commuinities  - used for algorithm testing 
 sparcc_inf <- function (list_wcoms, pval){
   
   infernt <- list()
