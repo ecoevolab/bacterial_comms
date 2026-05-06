@@ -12,30 +12,11 @@ library(stringr)
 library(rstan)
 library(gridExtra)
 library(rstanemax)
-# To do list: 
-# * bayesplot - pairs 
-# * bayesplot - trace 
-# * distribution graph 
-# r x iter graph 
 
 # Load the data (stan outputs) ---------------------------------------------------
-stan_out_allbut <- readRDS("03_Output/rstan_logistic_fitting/rk_by_temp_and_strain_withoutCH29")
-CH29_30_10 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T30_10times")
-CH29_30_6 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T30_6times")
-CH29_37_10 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T37_10times")
-CH29_37_6 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T37_6times")
-CH29_42_10 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T42_10times")
-CH29_42_6 <- readRDS("03_Output/rstan_logistic_fitting/CH29_T42_6times")
+stan_toutputs <- readRDS("bacterial_comms/03_Output/stan_func_rk_vectors")
 
 # Merge two lists (for posterior manipulation) -------------------------------------
-CH29_allist <- list( CH29_T30_10t = CH29_30_10,
-                     CH29_T30_6t = CH29_30_6, 
-                     CH29_T37_10t = CH29_37_10,
-                     CH29_T37_6t = CH29_37_6,
-                     CH29_T42_10t = CH29_42_10,
-                     CH29_T42_6t = CH29_42_6)
-
-stan_toutputs <- append(stan_out_allbut, CH29_allist)
 
 # TRACE GRAPHS -------------------------------------------------------------------
 # Ref: https://mc-stan.org/rstan/reference/stanfit-method-plot.html
@@ -63,14 +44,14 @@ dev.off()
 
 
 # plot()----------------------------------------------
-pdf("03_Output/Traceplots_plotfun.pdf", width = 15, height = 7)
+pdf("bacterial_comms_output/traceplot_rk_5_5_26.pdf", width = 15, height = 7)
 
 for (i in 1:length(stan_toutputs)){
   # Strain for title 
   strain <- names(stan_toutputs)[i]
 
   # adding title to each plot 
-  x <- plot(stan_toutputs[[i]], plotfun = "trace", pars = c("r", "k", "sigma"), inc_warmup = TRUE) +
+  x <- plot(stan_toutputs[[i]], plotfun = "trace", pars = c("r", "k"), inc_warmup = TRUE) +
     labs(title = paste("Traceplot:", strain),
          subtitle = "Shaded area: Warmup / Unshaded area: Sampling")
   
@@ -91,7 +72,7 @@ for (i in 1:length(stan_toutputs)){
   
   color_scheme_set("purple")
   # adding title to each plot 
-  x <- pairs(stan_toutputs[[i]], pars = c("r", "k", "sigma"), gap = 0, 
+  x <- pairs(stan_toutputs[[i]], pars = c("r", "k"), gap = 0, 
              main = paste0("Pairs plot_", strain), pch = 16, cex = 0.5) 
   
   print(x)
@@ -102,7 +83,8 @@ dev.off()
 
 # mcmc_pairs fun ----------------------------------------------------------------
 
-pdf("03_Output/Pairsplots_mcmcfun.pdf", width = 15, height = 7 , onefile = TRUE)
+
+pdf("bacterial_comms_output/mcmcpairs_5_5_26_rk.pdf", width = 15, height = 7, onefile = TRUE)
 
 for (i in 1:length(stan_toutputs)){
   # Strain for title 
@@ -111,9 +93,9 @@ for (i in 1:length(stan_toutputs)){
   
   color_scheme_set("brightblue")
   # adding title to each plot 
-  x <- mcmc_pairs(pst_cp2, pars = c("r", "k", "sigma"),
+  x <- mcmc_pairs(pst_cp2, pars = c("r", "k"),
                   diag_fun = "hist", off_diag_fun = "hex",
-                  condition = pairs_condition(chains = list(1, 2:4)), 
+                  condition = pairs_condition(chains = list(1, 2:3)), 
                   grid_args = list(top = paste("Pairs plot:", strain))) 
   
   print(x)
@@ -158,7 +140,11 @@ ggplot(bxplot_rdf, aes(y = r,
                 fill = factor(Temperature))) +
   geom_boxplot() +
   theme_bw() +
-  facet_wrap(~ Strain, scale="free")+ 
+  facet_wrap(~ Strain, scale="free", labeller = as_labeller(c("CH111" = "Bacillus thuringiensis",  "CH149a" = "Micrococcus luteus",  
+                                                              "CH154a" = "Staphylococcus shinii", "CH161d" = "Bacillus infantis",
+                                                              "CH23" = "Bacillus altitudinis",   "CH29" = "Corunebacterium sp", 
+                                                              "CH447" = "Priestia megaterium",  "CH450" = "Metabacillus indicus",
+                                                              "CH90" = "Bacillus atrophaeus", "CH99b" = "Staphylococcus arlettae"))) + 
   scale_fill_manual(values = c("rosybrown1", "rosybrown3", "pink4"))+
   scale_y_continuous(name = "r values") +
   scale_x_discrete(name = "Strain") +
@@ -202,13 +188,16 @@ ggplot(bxplot_kdf, aes(y = k,
                        fill = factor(Temperature))) +
   geom_boxplot() +
   theme_bw() +
-  facet_wrap(~ Strain, scale="free")+ 
+  facet_wrap(~ Strain, scale="free", labeller = as_labeller(c("CH111" = "Bacillus thuringiensis",  "CH149a" = "Micrococcus luteus",  
+                                                              "CH154a" = "Staphylococcus shinii", "CH161d" = "Bacillus infantis",
+                                                              "CH23" = "Bacillus altitudinis",   "CH29" = "Corunebacterium sp", 
+                                                              "CH447" = "Priestia megaterium",  "CH450" = "Metabacillus indicus",
+                                                              "CH90" = "Bacillus atrophaeus", "CH99b" = "Staphylococcus arlettae"))) + 
   scale_fill_manual(values = c("tomato3", "tomato4", "red4"))+
   scale_y_continuous(name = "r values") +
   scale_x_discrete(name = "Strain") +
   ggtitle("k values by temperature") +
-  theme(plot.title = element_text(hjust = 0.5))
-
+  theme(plot.title = element_text(hjust = 0.5)) 
 
 # stan.hist ----------------------------------------------------------------------
 
@@ -231,7 +220,7 @@ dev.off()
 
 #### POSTERIOR DISTRIBUTION VISUALIZATION ####
 # plot density --------------------------------------------------------------------
-pdf("03_Output/bayesplot_rk_plots/mcmc_areas.pdf", width = 15, height = 7 , onefile = TRUE)
+pdf("bacterial_comms_output/densityplot_6_5_26.pdf", width = 15, height = 7 , onefile = TRUE)
 
 for (i in 1:length(stan_toutputs)){
   
@@ -241,7 +230,7 @@ for (i in 1:length(stan_toutputs)){
 
     p_dens <- mcmc_areas(
     posterior,
-    pars = c("r", "k",),
+    pars = c("r", "k"),
     prob = 0.95,       # 95% int
     prob_outer = 0.99, # 99% line
     point_est = "median"
@@ -255,7 +244,7 @@ dev.off()
 
 # mcmc_dens -------------------------------------------------------------------
 
-pdf("03_Output/bayesplot_rk_plots/mcmc_dens_rk.pdf", width = 10, height = 5 , onefile = TRUE)
+pdf("bacterial_comms_output/densityplot_6_5_26.pdf", width = 10, height = 5 , onefile = TRUE)
 
 for (i in 1:length(stan_toutputs)){
   
@@ -264,8 +253,8 @@ for (i in 1:length(stan_toutputs)){
   
   color_scheme_set("mix-teal-pink")
   
-  g <- mcmc_dens_overlay(f, pars = c("r", "k", "sigma"),
-                    facet_args = list(nrow = 3)) +
+  g <- mcmc_dens_overlay(f, pars = c("r", "k"),
+                    facet_args = list(nrow = 2)) +
     facet_text(size = 14) + 
     ggtitle(paste("Density", names(stan_toutputs)[i])) +
     theme_minimal()
@@ -277,7 +266,7 @@ dev.off()
 
 # mcmc_areas -----------------------------------------------------------------
 
-pdf("03_Output/bayesplot_rk_plots/mcmc_areas_rk.pdf", width = 10, height = 5 , onefile = TRUE)
+pdf("bacterial_comms_output/mcmc_areas_6_5_26.pdf", width = 10, height = 5 , onefile = TRUE)
 
 for (i in 1:length(stan_toutputs)){
   
@@ -286,7 +275,7 @@ for (i in 1:length(stan_toutputs)){
   
   color_scheme_set("mix-teal-pink")
   
-  g <- mcmc_areas(f, regex_pars = c("r", "k", "sigma"),  prob = 0.8) +
+  g <- mcmc_areas(f, regex_pars = c("r", "k"),  prob = 0.8) +
     labs(
       title = paste("Posterior distributions", strain),
       subtitle = "with medians and 80% intervals"

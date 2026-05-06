@@ -74,6 +74,107 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
   return(stan_output)
 }
 
+
+# logistic growth (deSolve) / testing stan model 
+logistic_eq <- function(t, state, parameters){
+  with(as.list(c(state, parameters)), {
+    dz <- r * z * (1 - z / k)
+    return(list(c(dz)))
+  })
+}
+
+
+# Growth curves ---------------------------------------------------------------
+
+# To get each growth curve in the cc database - one per temperature/strain 
+growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, interest_column, replica_col){
+  
+  strains <- sort(unique(df[[strain_col]]), decreasing = F)
+  all_curvesbyt <- list()
+  tempt <- as.numeric(temps)
+  
+  for (i in 1:length(strains)){
+    for (f in 1:length(tempt)){
+      title <- paste0(strains[i], "_T", tempt[f])
+      
+      all_curvesbyt[[title]] <- df[df[[strain_col]] == strains[i] & df[[temp_col]] == tempt[f], ]
+    }
+  }
+  
+  plot_list <- list()
+  
+  for (g in 1:length(all_curvesbyt)){
+    current_name <- names(all_curvesbyt)[g]
+    gcurveplot <- ggplot(all_curvesbyt[[g]], aes(x = .data[[samplebyh]], 
+                                                 y = .data[[interest_column]], 
+                                                 group = .data[[replica_col]], 
+                                                 colour = as.factor(.data[[replica_col]]))) +
+      geom_point() + 
+      geom_line(na.rm = TRUE) + 
+      theme_classic() +
+      xlab("Time (hr)") + ylab("Absorbance (OD600 nm)") +
+      labs(title = paste("Growth curve:", current_name))
+    
+    plot_list[[current_name]] <- gcurveplot
+  }
+  return(plot_list)
+}
+
+# COMPARISON BETWEEN STAN MODEL CURVE & THE REAL DATA SAMLING FUNCION 
+
+stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, temp_col, interest_col){
+  
+  library(ggplot2)
+  library(deSolve)
+  
+  init <- c(z = initialv)
+  plot_list <- list()
+  names_outs <- names(outs) 
+  
+  for (f in 1:length(outs)){
+    
+    # Extract "outs" summary (to get the specific r & k values)
+    current_tag <- names_outs[f]  # get the 1..2..3.. outs names
+    summ <- summary(outs[[f]])$summary # get the summary for the specific name 
+    
+    # get r & k values 
+    r_val <- as.numeric(summ["r", "mean"])
+    k_val <- as.numeric(summ["k", "mean"])
+    p_actual <- c(r = r_val, k = k_val) # to use in the deSolve equation
+    
+    # solve ode & change column names in the ode object 
+    outsolve <- as.data.frame(ode(y = init, times = timesf, func = logistic_eq, parms = p_actual))
+    colnames(outsolve) <- c("time", "OD_sim")
+    
+    # Filter real data (actual OD sampling)
+    split_name <- strsplit(current_tag, split = "_")[[1]]
+    strain_n <- split_name[1]
+    temp_v   <- as.numeric(gsub("T", "", split_name[2]))
+    
+    # this way i get the specific strain & temp values to compare to the ode results 
+    real_subset <- realdata[realdata[[strain_col]] == strain_n & realdata[[temp_col]] == temp_v, ]
+    
+    # Plotting 
+    # We can use r_val & k_val because these are numeric values 
+    g <- ggplot() +
+      geom_line(data = outsolve, aes(x = time, y = OD_sim), color = "deeppink", linewidth = 1) +
+      
+      geom_point(data = real_subset, aes(x = .data[[samplebyh]], y = .data[[interest_col]]), 
+                 color = "red4", alpha = 0.6) +
+      
+      theme_classic() +
+      ylim(0, 1.8) +
+      labs(title = paste("Stan vs Real:", current_tag),
+           subtitle = sprintf("r = %.3f | k = %.3f", r_val, k_val),
+           x = "Time (hr)", y = "Absorbance (OD600)")
+    
+    plot_list[[current_tag]] <- g
+  }
+  
+  return(plot_list)
+}
+
+
 # get real od function ---------------------------------------------------------
 get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
   
@@ -120,6 +221,7 @@ get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, inter
 # Reconstruction methods -------------------------------------------------------
 
 # Community isolation 
+# to get the 12 communities for each temperature 
 
 community_isolation <- function(rcommunities, sample, sample_col, rcommunities_col, df, arrangev, interest_column, dfwvals, composition_df){
   
