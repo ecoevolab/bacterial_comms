@@ -42,7 +42,8 @@ model {
   // extract the data for THAT replica 
   for (i in 1:S){                                  // s = number of replicas "do it s times"
    int N_s = sizes[i];                             // to get the size of the n vector (replica 1 = 10 timepoints)
-   
+   int N_sim = N_s - 1;
+
    vector[N_s] time_s = segment(y_time, point, N_s); // create a 10 n vector / time_s / y_time = source, point = initial value of the sample, N_s = size of the vector 
    vector[N_s] obs_s = segment(y_obs, point, N_s);   // extract the specific observations
    
@@ -52,7 +53,6 @@ model {
    real t_start = time_s[1]; // get the first time for the start of the simulation 
 
    // modify the segment as array 
-    int[N_sim] = N_s - 1; 
     array[N_sim] real t_array; // create an array, of size N_sim (N_s - 1 (because we don't want to count the first time))
     
     for (n in 1:N_sim) { // "do it 1-x times"
@@ -60,15 +60,16 @@ model {
     }
    
    // solve the ODE with the array 
-array[N_s] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   #solve it 
+array[N_sim] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   #solve it 
    
    // likelihood 
-   for (n in 1:N_s){
-     obs_s[n] ~ normal(z[n][1], sigma);
+   for (n in 1:N_sim){
+     obs_s[n + 1] ~ normal(z[n][1], sigma);
    }
    
    point = point + N_s; # to get the next vector size and repeat S
   }
-  
+
+
 
 }
