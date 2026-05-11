@@ -33,8 +33,8 @@ parameters {
 
 model {
   // Priors
-  r ~ normal(0.3, 0.05);
-  k ~ normal(0.8, 0.05);
+  r ~ lognormal(-0.7, 0.5);
+  k ~ lognormal(0.2, 0.5);
 
   // Prior for the initial state based on the values
   int point = 1; 
@@ -49,16 +49,18 @@ model {
    // extract the initial value 
    vector[1] z0;
    z0[1] = obs_s[1]; // z0 size 1 / its going to be obs_s first value (initial sampling value)
-   
+   real t_start = time_s[1]; // get the first time for the start of the simulation 
+
    // modify the segment as array 
-    array[N_s] real t_array; // create an array, of size N_s (10 timepoints for example) & name it t_array
+    int[N_sim] = N_s - 1; 
+    array[N_sim] real t_array; // create an array, of size N_sim (N_s - 1 (because we don't want to count the first time))
     
-    for (n in 1:N_s) { // "do it 1-10 times"
-      t_array[n] = time_s[n]; #copy the timeseries to the t_array (for ode_rk45 to function)
+    for (n in 1:N_sim) { // "do it 1-x times"
+      t_array[n] = time_s[n + 1]; #copy the timeseries to the t_array (for ode_rk45 to function)
     }
    
    // solve the ODE with the array 
-array[N_s] vector[1] z = ode_rk45(lvfnc, z0, t_array[1] - 0.0001, t_array, r, k);   #solve it 
+array[N_s] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   #solve it 
    
    // likelihood 
    for (n in 1:N_s){
