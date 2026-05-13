@@ -61,6 +61,7 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
         iter = niterations,
         chains = nchains, 
         init = init_fun, 
+        cores = parallel::detectCores(), 
         refresh = 50 
       )
       

@@ -30,7 +30,6 @@ stan_matrizout <- readRDS("bacterial_comms/03_Output/rk_by_temp_and_strain_witho
 pruebafunc <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
                            niterations = 1500, nchains = 3, rvalin = 0.3, kvalin = 0.8, sigma_val = 0.05)
-
 # saveRDS(pruebafunc, file = "03_Output/stan_func_rk_vectors")
 
 # ODE check -----------------------------------------------------------------

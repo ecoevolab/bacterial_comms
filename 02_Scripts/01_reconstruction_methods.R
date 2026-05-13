@@ -6,12 +6,14 @@ library(mlBioNets)
 library(dplyr)
 library(tibble)
 library(SpiecEasi)
+library(textshape)
+install.packages("WGCNA")
 
 # Load tsv archives ----------------------------------------------------------------
-metadata <- as.data.frame(read_tsv(file = "bacterial_comms/01_RawData/metadata_clean.tsv"))
+metadata <- as.data.frame(read_tsv(file = "01_RawData/metadata_clean.tsv"))
 metadata[is.na(metadata)] <- 0
-f_clean <- as.data.frame(read_tsv("bacterial_comms/01_RawData/f_clean.tsv"))
-rzcompositiondata <- read.csv("bacterial_comms/01_RawData/rzcomposition.csv")
+f_clean <- as.data.frame(read_tsv("01_RawData/f_clean.tsv"))
+rzcompositiondata <- read.csv("01_RawData/rzcomposition.csv")
 
 ## Community isolation -------------------------------------------------------------
 comms_rhiz <- unique(metadata$community) # to use all the community values for subsetting the df 
@@ -28,11 +30,60 @@ rz_communities # List with all the communities and their respective composition/
 
 ##### Testing network inference algortihms -----------------------------------------
 
+# 1. Isolate only by community 
+community_list <- list()
+k <- 1
+# subset the commuinity values based on the day and community name 
+for (i in 1:length(comms_rhiz)){
+
+    community_list[[k]] <- subset(metadata, community %in% comms_rhiz[i])  %>% 
+      arrange("day") %>% 
+      pull("label") %>% 
+      as.character()
+    
+    k <- k + 1
+  
+}
+
+# create an empty list for the abundances 
+abundances_tables <- list()
+
+# Based on the column names, select the values from the data.frame with sample measures  
+for (id in seq_along(community_list)) {
+  abundances_tables[[id]] <- f_clean %>%
+    dplyr::select(1 | all_of(community_list[[id]]))  %>%
+    column_to_rownames("row.names") # Asumming the first column belongs to the row names 
+  
+}
+
+abnds_filtered <- list()
+
+for (g in seq_len(ncol(rzcompositiondata))) {
+  
+  # select the community name / for arranging the list 
+  comm_name <- colnames(rzcompositiondata)[g]
+  
+  # select the specific bacterial id for the selected community 
+  spp <- rzcompositiondata[, g]
+  spln <- 1:length(spp)
+    
+    abnds_filtered[[paste0(comm_name)]] <- abundances_tables[[g]] %>% 
+      filter(row.names(abundances_tables[[g]]) %in% spp)
+    
+}
+
+#### ALGORITHMS #### 
+
+
+# WGCNA #
+
+
 #### SPARCc ------------------------------------------------------------------------
 
 # 1. Calculate the p value 
-sparcc_rhizobial <- sparcc_inf(rz_communities, pval = 0.5)
+sparcc_rhizobial <- sparcc_inf(abnds_filtered, pval = 0.5)
 
+#### WGCNA 
 
 
   
