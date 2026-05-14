@@ -27,9 +27,9 @@ stan_toutputs <- readRDS("bacterial_comms/03_Output/stan_func_rk_vectors")
 stan_matrizout <- readRDS("bacterial_comms/03_Output/rk_by_temp_and_strain_withoutCH29")
 
 # Pipeline -------------------------------------------------------------------
-pruebafunc <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
+rk_general_priors <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
-                           niterations = 1500, nchains = 3, rvalin = 0.3, kvalin = 0.8, sigma_val = 0.05)
+                           niterations = 1500, nchains = 2, rvalin = 0.8, kvalin = 1.2, sigma_val = 0.05)
 # saveRDS(pruebafunc, file = "03_Output/stan_func_rk_vectors")
 
 # ODE check -----------------------------------------------------------------
@@ -62,6 +62,19 @@ points(individual_growth$hr[individual_growth$Cepa == "CH23" & individual_growth
        pch = 16, col = "red4")
 
 # USING THE FUNCTION I CREATED TTO COMPARE STAN VS GROWTH CURVES SAMPLES 
-curvecomparison <- stanvsgw(stan_toutputs, seq(0, 18, 0.1), 0.001, individual_growth, "hr", "Cepa", "temp", "OD_real")
-curvecomparison$CH23_T30
+indv_gro <- read_tsv("01_RawData/modified_individual_strain_growth_curves_ord_replica - individual_strains_growth_curves_filtered.tsv")
+individual_growth <- as.data.frame(indv_gro)
+
+stan_toutputs <- readRDS("03_Output/stan_func_rk_vectors")
+curvecomparison <- stanvsgw(stan_toutputs, seq(0, 18, 0.1), 0.001, individual_growth, "hr", "Cepa", "temp", "OD_real", 
+                            n_samples = 60)
+curvecomparison$CH29_T30
+curvecomparison$CH447_T37
+curvecomparison$CH447_T42
+
+real_gwtcurves <- growth_curves_func(df = individual_growth, temps = c(30,37,42), strain_col = "Cepa", temp_col = "temp",
+                   samplebyh = "hr", interest_column = "OD_real", replica_col = "ord_replica")
+real_gwtcurves$CH29_T30
+real_gwtcurves$CH447_T37
+real_gwtcurves$CH447_T42
 

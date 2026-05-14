@@ -33,7 +33,7 @@ parameters {
 
 model {
   // Priors
-  r ~ lognormal(-0.7, 0.5);
+  r ~ lognormal(0, 0.5);
   k ~ lognormal(0.2, 0.5);
 
   // Prior for the initial state based on the values

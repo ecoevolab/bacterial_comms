@@ -61,7 +61,6 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
         iter = niterations,
         chains = nchains, 
         init = init_fun, 
-        cores = parallel::detectCores(), 
         refresh = 50 
       )
       
@@ -70,6 +69,95 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
   return(stan_output)
 }
 
+# 1.1 logistic ode 
+
+logistic_ode <- function(t, x, parms) {
+  r <- parms$r
+  k <- parms$k
+  
+  dxdt <- r * x * (1 - x / k)
+  
+  return(list(x = dxdt))
+}
+
+
+# 1.2 compare obs - pred 
+compare_obs_pred <- function(r, k , Obs){
+  Obs %>%
+    map_dfr(function(obs,r,k){
+      sim <- ode(y = obs$obs[1],
+                 times = obs$hrs,
+                 func = logistic_ode,
+                 parms = list(r = r, k = k))[,2]
+      
+      ss <- sum(obs$obs - sim) ^2
+      n <- length(sim)
+      
+      tibble(ss = ss,
+             n = n)
+      
+    }, r = r, k = k) %>%
+    summarise(ss_tot = sum(ss),
+              n_tot = sum(n)) %>%
+    mutate(sse = ss_tot / n_tot) %>%
+    select(sse) %>%
+    unlist
+}
+
+# 1.3 Obs filtering for r & k prior estimation 
+rk_prior_testing <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
+  
+  # Assigning objects to specific values in the data.frame 
+  
+  spps <- unique(df[[strain_col]])  # total n. of spps in the data.frame (for the naming of the vectors)
+  ntemps <- sort(unique(df[[temp_col]]), decreasing = FALSE) # N. of total temperatures in the data.frame 
+  
+  # list for the resulting fitting
+  obs_filtered <- list()
+  grid_results <- list()
+  
+  for (m in 1:length(spps)) {
+    for (o in 1:length(ntemps)) {
+
+        # filter the data.frame 
+        df_complete <- df %>% 
+          filter(.data[[strain_col]] == spps[m], # filter each strain 
+                 .data[[temp_col]] ==ntemps[o]) %>%  # filter by temp 
+          arrange(.data[[replica_col]], .data[[sample_byh]])     # arrange by the number of replica 
+        
+        strain_temptag <- paste0(spps[m], "_T", ntemps[o])
+        replica_list <- df_complete %>%
+                        group_split(.data[[replica_col]]) %>%
+                        map(~{
+                           .x %>%
+                           select(hrs = .data[[sample_byh]], obs = .data[[interest_col]])
+                           })
+        obs_filtered[strain_temptag] <- replica_list
+        
+        Res <- expand_grid(r = seq(0.1, 2, by = 0.1),
+                           k = seq(0.5, 2, by = 0.1))
+        
+        # obs == replica_list 
+        Res$sse <- Res %>% 
+          pmap_dbl(.f = compare_obs_pred, Obs = replica_list)
+        
+        # keep the results 
+        grid_results[[strain_temptag]] <- Res %>% arrange(sse)
+        
+        # plotting 
+        p <- ggplot(Res, aes(x = r, y = k)) +
+          geom_tile(aes(fill = sse)) +
+          scale_fill_gradient2(low = "blue", mid = "lightyellow", high = "red",
+                               midpoint = mean(Res$sse)) +
+          labs(title = strain_temptag) +
+          theme_classic()
+        
+        print(p) 
+        
+   }
+  }
+  return(list(obs = obs_filtered, grid_output = grid_results))
+}
 
 # 2. logistic growth (deSolve) / for testing stan model
 logistic_eq <- function(t, state, parameters){
@@ -118,50 +206,74 @@ growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, inter
 
 
 # 4. Compare stan results vs the actual growth curves 
-stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, temp_col, interest_col){
+stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, temp_col, interest_col, n_samples){
   
   library(ggplot2)
-  library(deSolve)
+  library(dplyr)
+  library(purrr)
+  library(tidyr)
   
-  init <- c(z = initialv)
   plot_list <- list()
   names_outs <- names(outs) 
   
   for (f in 1:length(outs)){
     
-    # Extract "outs" summary (to get the specific r & k values)
-    current_tag <- names_outs[f]  # get the 1..2..3.. outs names
-    summ <- summary(outs[[f]])$summary # get the summary for the specific name 
+    current_tag <- names_outs[f]
+    rkvals <- as.data.frame(outs[[f]])
     
-    # get r & k values 
-    r_val <- as.numeric(summ["r", "mean"])
-    k_val <- as.numeric(summ["k", "mean"])
-    p_actual <- c(r = r_val, k = k_val) # to use in the deSolve equation
+    # select an x number of samples to graph/plot 
+    set.seed(123) 
+    vz <- sample(1:nrow(rkvals), min(n_samples, nrow(rkvals)))
+    samples_df <- rkvals[vz, ]
     
-    # solve ode & change column names in the ode object 
-    outsolve <- as.data.frame(ode(y = init, times = timesf, func = logistic_eq, parms = p_actual))
-    colnames(outsolve) <- c("time", "OD_sim")
-    
-    # Filter real data (actual OD sampling)
-    split_name <- strsplit(current_tag, split = "_")[[1]]
-    strain_n <- split_name[1]
-    temp_v   <- as.numeric(gsub("T", "", split_name[2]))
-    
-    # this way i get the specific strain & temp values to compare to the ode results 
-    real_subset <- realdata[realdata[[strain_col]] == strain_n & realdata[[temp_col]] == temp_v, ]
-    
-    # Plotting 
-    # We can use r_val & k_val because these are numeric values 
-    g <- ggplot() +
-      geom_line(data = outsolve, aes(x = time, y = OD_sim), color = "deeppink", linewidth = 1) +
+    # create curves 
+    n0 <- initialv 
+    curves <- map_df(1:nrow(samples_df), function(i) {
+      r_i <- samples_df$r[i]
+      k_i <- samples_df$k[i]
       
+      # get the logistic curve 
+      tibble(
+        time = timesf,
+        OD_sim = k_i / (1 + ((k_i - n0) / n0) * exp(-r_i * timesf)),
+        iter = i
+      )
+    })
+    
+    # mean line (just to see it and compare with the rest 
+    r_mean <- mean(rkvals$r)
+    k_mean <- mean(rkvals$k)
+    
+    meanline <- tibble(
+      time = timesf,
+      OD_sim = k_mean / (1 + ((k_mean - n0) / n0) * exp(-r_mean * timesf))
+    )
+    
+    # filter real data 
+    split_name <- strsplit(current_tag, split = "_")[[1]]
+    strainm <- split_name[1]
+    temps   <- as.numeric(gsub("T", "", split_name[2]))
+    
+    real_subset <- realdata[realdata[[strain_col]] == strainm & realdata[[temp_col]] == temps, ]
+    
+    # 5. Plotting
+    g <- ggplot() +
+      
+      # group of lines 
+      geom_line(data = curves, aes(x = time, y = OD_sim, group = iter), 
+                color = "deeppink4", alpha = 0.1) +
+      
+      # mean line - higher linewidth so we can see it better 
+      geom_line(data = meanline, aes(x = time, y = OD_sim), 
+                color = "deeppink", linewidth = 1.2) +
+      
+      # real data points 
       geom_point(data = real_subset, aes(x = .data[[samplebyh]], y = .data[[interest_col]]), 
-                 color = "red4", alpha = 0.6) +
+                 color = "red4", size = 2, alpha = 0.7) +
       
       theme_classic() +
-      ylim(0, 1.8) +
-      labs(title = paste("Stan vs Real:", current_tag),
-           subtitle = sprintf("r = %.3f | k = %.3f", r_val, k_val),
+      labs(title = paste("Posterior Predictive Check:", current_tag),
+           subtitle = sprintf("Media: r = %.3f | k = %.3f", r_mean, k_mean),
            x = "Time (hr)", y = "Absorbance (OD600)")
     
     plot_list[[current_tag]] <- g
