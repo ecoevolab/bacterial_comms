@@ -4,7 +4,7 @@
 # Stan functions ---------------------------------------------------------------
 
 # 1. Stan function with the Log LV model 
-stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col, niterations, nchains, rvalin, kvalin, sigma_val){
+stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col, inits_list, niterations, nchains, sigma_val){
   
   # Assigning objects to specific values in the data.frame 
   
@@ -14,8 +14,19 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
   # list for the resulting fitting
   stan_output <- list()
   
+  # FOR INITIAL R & K AND PRIORS 
+  best_inits <- map_df(names(inits_list$grid_output), function(st_name) {
+    inits_list$grid_output[[st_name]] %>%
+      arrange(sse) %>%   # arrange by best sse
+      slice(1) %>%       # get the lowest 
+      mutate(id = st_name) %>%
+      dplyr::select(id, r_init = r, k_init = k)
+  })
+  
   for (m in 1:length(spps)) {
     for (o in 1:length(ntemps)) {
+      # naming tag 
+      strain_name <- paste0(spps[m], "_T", ntemps[o])
       
       # filter the data.frame 
       df_complete <- df %>% 
@@ -23,44 +34,61 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
                .data[[temp_col]] ==ntemps[o]) %>%  # filter by temp 
         arrange(.data[[replica_col]])     # arrange by the number of replica 
       
-       # subset/split the data.frame by replica 
+      # subset/split the data.frame by replica 
       replica_list <- split(df_complete, df_complete[[replica_col]]) 
       
-      # create the time and obs vectors 
+      # TIME AND OBS VECTORS 
       time_flat <- unlist(lapply(replica_list, function(x) x[[sample_byh]]))
       
-      obs_flat <- unlist(lapply(replica_list, function(x) x[[interest_col]])) 
-
-
-      # generate the stan_data that's going to be used in the stan function 
+      obs_flat <- unlist(lapply(replica_list, function(x) x[[interest_col]]))
+      # SPECIFIC PARAMETERS TO THIS FOR LOOP 
+      row_id <- best_inits %>%
+        filter(id == strain_name)
+      
+      rvalin <- row_id$r_init
+      kvalin <- row_id$k_init
+      
+        if (kvalin < 1.0) {
+          sd_k <- 0.4   
+          sd_r <- 0.3
+          
+        } else {
+          sd_k <- 1.0 
+          sd_r <- 1.5
+          
+        }
+      
+      fixed_inits <- lapply(1:nchains, function(id) {
+        list(r = rvalin, k = kvalin)
+      })
+      
+      
+      # STAN_DATA 
       stan_data <- list(
         S = length(replica_list), # number of replicas 
         totalobs = length(obs_flat),  # total of observations 
         sizes = as.array(sapply(replica_list, nrow)), # size of each replica 
         y_time = time_flat, 
         y_obs = obs_flat, 
-        sigma = sigma_val
+        sigma = sigma_val,
+        rlog = rvalin,
+        klog = kvalin, 
+        sdk = sd_k, 
+        sdr = sd_r
       )
       
-      # assign a name to the object 
-      strain_name <- paste0(spps[m], "_T", ntemps[o])
-      
-      #Initial values for the stan model 
-      init_fun <- function(){
-        list(
-        r = as.numeric(rvalin), 
-        k = as.numeric(kvalin))
-      }
       
       # Stan function 
       # loglv_mod.stan -- stan function 
       
+      message(paste("Stan running for:", strain_name))    
+      print(paste("Diagnosis Cepa 1 -> r:", rvalin, "K:", kvalin))
       stan_output[[strain_name]] <- stan(
         file = "02_Scripts/loglv_mod.stan",
         data = stan_data, 
         iter = niterations,
         chains = nchains, 
-        init = init_fun, 
+        init = fixed_inits, 
         refresh = 50 
       )
       
@@ -68,6 +96,7 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
   }
   return(stan_output)
 }
+
 
 # 1.1 logistic ode 
 
@@ -90,7 +119,7 @@ compare_obs_pred <- function(r, k , Obs){
                  func = logistic_ode,
                  parms = list(r = r, k = k))[,2]
       
-      ss <- sum(obs$obs - sim) ^2
+      ss <- sum((obs$obs - sim) ^2)
       n <- length(sim)
       
       tibble(ss = ss,
@@ -100,9 +129,10 @@ compare_obs_pred <- function(r, k , Obs){
     summarise(ss_tot = sum(ss),
               n_tot = sum(n)) %>%
     mutate(sse = ss_tot / n_tot) %>%
-    select(sse) %>%
+    dplyr::select(sse) %>%
     unlist
 }
+
 
 # 1.3 Obs filtering for r & k prior estimation 
 rk_prior_testing <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
@@ -130,15 +160,16 @@ rk_prior_testing <- function (df, temp_col, replica_col, strain_col, sample_byh,
                         group_split(.data[[replica_col]]) %>%
                         map(~{
                            .x %>%
-                           select(hrs = .data[[sample_byh]], obs = .data[[interest_col]])
+                           dplyr::select(hrs = all_of(sample_byh), obs = all_of(interest_col))
                            })
-        obs_filtered[strain_temptag] <- replica_list
+        obs_filtered[[strain_temptag]] <- replica_list
         
         Res <- expand_grid(r = seq(0.1, 2, by = 0.1),
                            k = seq(0.5, 2, by = 0.1))
         
         # obs == replica_list 
         Res$sse <- Res %>% 
+          dplyr::select(r, k) %>%
           pmap_dbl(.f = compare_obs_pred, Obs = replica_list)
         
         # keep the results 
@@ -219,7 +250,7 @@ stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, te
   for (f in 1:length(outs)){
     
     current_tag <- names_outs[f]
-    rkvals <- as.data.frame(outs[[f]])
+    rkvals <- as.data.frame(outs[[f]], pars = c("r", "k"))
     
     # select an x number of samples to graph/plot 
     set.seed(123) 

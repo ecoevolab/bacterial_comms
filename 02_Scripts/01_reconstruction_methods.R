@@ -30,7 +30,7 @@ rz_communities # List with all the communities and their respective composition/
 
 ##### Testing network inference algortihms -----------------------------------------
 
-# 1. Isolate only by community 
+# 1. Isolate only by community (not temperature)
 community_list <- list()
 k <- 1
 # subset the commuinity values based on the day and community name 
@@ -74,16 +74,45 @@ for (g in seq_len(ncol(rzcompositiondata))) {
 
 #### ALGORITHMS #### 
 
+# MRNET # 
+# Based on mutual information 
 
 # WGCNA #
 
 
 #### SPARCc ------------------------------------------------------------------------
+library (mlBioNets)
+# Undirected
+# Based on correlations 
+sparcc_rhizobial <- sparcc_inf(abnds_filtered, pval = 0.05)
+# the function gets the p and cor matrixes by itself, pval corresponds only to the significance 
 
-# 1. Calculate the p value 
-sparcc_rhizobial <- sparcc_inf(abnds_filtered, pval = 0.5)
+#### GENIE3 -----------------------------------------------------------------------
+# Directed & weighted 
+# Based on 
 
-#### WGCNA 
+library(GENIE3)
+
+# weighted matrix 
+weightMat <- GENIE3(exprMatr)
+
+# get regulatory links 
+linkList <- getLinkList(weightMat)
+top_edges <- linkList[1:500, ]
+grn_graph <- graph_from_data_frame(d = top_edges, directed = TRUE)
+
+# assigning vertex & edge attributes 
+V(grn_graph)$size <- 5
+V(grn_graph)$label <- V(grn_graph)$name
+V(grn_graph)$label.cex <- 0.6
+V(grn_graph)$color <- "lightblue"
+
+# Plot the directed network
+plot(grn_graph, 
+     layout = layout_with_fr(grn_graph), # Fruchterman-Reingold layout
+     vertex.label.dist = 0.5,
+     edge.arrow.size = 0.3,
+     main = "Inferred Gene Regulatory Network")
 
 
   

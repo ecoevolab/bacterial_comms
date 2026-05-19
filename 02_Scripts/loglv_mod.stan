@@ -8,7 +8,7 @@ functions {
     vector[num_elements(z)] dzdt ;     // vecttor dzdt 
     
     for (j in 1:num_elements(z)) {
-      dzdt[j] = r * z[j] * (1 - z[j] / k);
+      dzdt[j] = r * z[j] * (1.0 - z[j] / k);
     }
     return dzdt;
   }
@@ -23,6 +23,11 @@ data {
   vector[totalobs] y_obs;         // vector list with population measures (all of them )
   
   real<lower=0> sigma;        // specific value for sigma 
+  real rlog;                   // for the specific r prior
+  real klog;                   // for the specific k prior 
+  
+  real sdk;
+  real sdr;
 }
 
 
@@ -33,8 +38,8 @@ parameters {
 
 model {
   // Priors
-  r ~ lognormal(0, 0.5);
-  k ~ lognormal(0.2, 0.5);
+  r ~ lognormal(log(rlog), sdr);
+  k ~ lognormal(log(klog), sdk);
 
   // Prior for the initial state based on the values
   int point = 1; 
@@ -56,20 +61,21 @@ model {
     array[N_sim] real t_array; // create an array, of size N_sim (N_s - 1 (because we don't want to count the first time))
     
     for (n in 1:N_sim) { // "do it 1-x times"
-      t_array[n] = time_s[n + 1]; #copy the timeseries to the t_array (for ode_rk45 to function)
+      t_array[n] = time_s[n + 1];// copy the timeseries to the t_array (for ode_rk45 to function)
+      
     }
    
    // solve the ODE with the array 
-array[N_sim] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   #solve it 
+array[N_sim] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   // solve it 
    
    // likelihood 
-   for (n in 1:N_sim){
-     obs_s[n + 1] ~ normal(z[n][1], sigma);
-   }
-   
-   point = point + N_s; # to get the next vector size and repeat S
-  }
+for (n in 1:N_sim) {
+  obs_s[n + 1] ~ normal(z[n][1], sigma);
+  // fmax compares two numbers and get the higher one - if the ode number is near 0 fmax 
+  // replace it with 0.000001 this to get strictly positive numbers 
+}
+obs_s[1] ~ normal(z0[1], sigma);
 
-
-
+point = point + N_s;
+}
 }

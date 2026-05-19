@@ -13,5 +13,7 @@ indv_gro <- as.data.frame(indv_gro)
 rk_valz_cc <- rk_prior_testing(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", strain_col = "Cepa", 
                                sample_byh = "hr", interest_col = "OD_real")
 
+rk_valz_cc$grid_output$CH161d_T30
 
-rk_valz_cc$grid_output$CH29_T30 
+# saveRDS(rk_valz_cc, file = "03_Output/rkpriors_heatmap")
+# rk_valz_cc<-  readRDS("03_Output/rkpriors_heatmap")

@@ -5,6 +5,8 @@ library(rstan)
 library(readr)
 library(dplyr)
 library(deSolve)
+library(tidytable)
+library(fitdistrplus)
 
 # Reference --------------------------------------------------------
 # Stan & Lotka-Volterra 
@@ -23,14 +25,25 @@ indv_gro <- as.data.frame(indv_gro)
 # stan_toutputs -- stan model performed with vectors 
 stan_toutputs <- readRDS("bacterial_comms/03_Output/stan_func_rk_vectors")
 
-# stan model performed with matrix 
-stan_matrizout <- readRDS("bacterial_comms/03_Output/rk_by_temp_and_strain_withoutCH29")
+
+# Test distribution ----------------------------------------------------------
+CH450_T47 <- indv_gro %>% 
+  filter(Cepa == "CH450", # filter each strain 
+         temp == 42) %>%  # filter by temp 
+  arrange(ord_replica) %>% 
+  pull(OD_real)
+
+descdist(CH450_T47, discrete = FALSE)
+
 
 # Pipeline -------------------------------------------------------------------
-rk_general_priors <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
+stan_rkvectors2 <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
-                           niterations = 1500, nchains = 2, rvalin = 0.8, kvalin = 1.2, sigma_val = 0.05)
-# saveRDS(pruebafunc, file = "03_Output/stan_func_rk_vectors")
+                           inits_list = rk_valz_cc, niterations = 1500, nchains = 2, sigma_val = 0.05)
+saveRDS(stan_rkvectors, file = "03_Output/stan_func_rk_vectors_lognormal")
+
+
+
 
 # ODE check -----------------------------------------------------------------
 
@@ -61,18 +74,20 @@ points(individual_growth$hr[individual_growth$Cepa == "CH23" & individual_growth
        individual_growth$OD_real[individual_growth$Cepa == "CH23" & individual_growth$temp == 42], 
        pch = 16, col = "red4")
 
-# USING THE FUNCTION I CREATED TTO COMPARE STAN VS GROWTH CURVES SAMPLES 
-indv_gro <- read_tsv("01_RawData/modified_individual_strain_growth_curves_ord_replica - individual_strains_growth_curves_filtered.tsv")
-individual_growth <- as.data.frame(indv_gro)
 
+
+
+
+
+# COMPARE STAN VS GROWTH CURVES
 stan_toutputs <- readRDS("03_Output/stan_func_rk_vectors")
-curvecomparison <- stanvsgw(stan_toutputs, seq(0, 18, 0.1), 0.001, individual_growth, "hr", "Cepa", "temp", "OD_real", 
+curvecomparison <- stanvsgw(stan_rkvectors, seq(0, 18, 0.1), 0.001, indv_gro, "hr", "Cepa", "temp", "OD_real", 
                             n_samples = 60)
 curvecomparison$CH29_T30
 curvecomparison$CH447_T37
 curvecomparison$CH447_T42
 
-real_gwtcurves <- growth_curves_func(df = individual_growth, temps = c(30,37,42), strain_col = "Cepa", temp_col = "temp",
+real_gwtcurves <- growth_curves_func(df = indv_gro, temps = c(30,37,42), strain_col = "Cepa", temp_col = "temp",
                    samplebyh = "hr", interest_column = "OD_real", replica_col = "ord_replica")
 real_gwtcurves$CH29_T30
 real_gwtcurves$CH447_T37
