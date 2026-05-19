@@ -39,7 +39,7 @@ parameters {
 model {
   // Priors
   r ~ lognormal(log(rlog), sdr);
-  k ~ lognormal(log(klog), sdk);
+  k ~ lognormal(log(klog), sdk) T[0,2];
 
   // Prior for the initial state based on the values
   int point = 1; 

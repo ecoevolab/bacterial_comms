@@ -82,7 +82,7 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
       # loglv_mod.stan -- stan function 
       
       message(paste("Stan running for:", strain_name))    
-      print(paste("Diagnosis Cepa 1 -> r:", rvalin, "K:", kvalin))
+      print(paste("Diagnosis Cepa -> r:", rvalin, "K:", kvalin))
       stan_output[[strain_name]] <- stan(
         file = "02_Scripts/loglv_mod.stan",
         data = stan_data, 
