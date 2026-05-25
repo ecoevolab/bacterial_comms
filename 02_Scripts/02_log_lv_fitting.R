@@ -7,6 +7,7 @@ library(dplyr)
 library(deSolve)
 library(tidytable)
 library(fitdistrplus)
+library(ggplot2)
 
 # Reference --------------------------------------------------------
 # Stan & Lotka-Volterra 
@@ -23,7 +24,8 @@ indv_gro <- read_tsv("01_RawData/modified_individual_strain_growth_curves_ord_re
 indv_gro <- as.data.frame(indv_gro)
 
 # stan_toutputs -- stan model performed with vectors 
-stan_toutputs <- readRDS("bacterial_comms/03_Output/stan_func_rk_vectors")
+outputs_lognormal <- readRDS("03_Output/stan_func_rk_vectors_lognormal")
+outputs_normal <- readRDS("03_Output/stan_func_rk_vectors_normal")
 
 
 # Test distribution ----------------------------------------------------------
@@ -37,59 +39,45 @@ descdist(CH450_T47, discrete = FALSE)
 
 
 # Pipeline -------------------------------------------------------------------
+# r & k priors from heatmap testing 
 stan_rkvectors2 <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
                            inits_list = rk_valz_cc, niterations = 1500, nchains = 2, sigma_val = 0.05)
-saveRDS(stan_rkvectors, file = "03_Output/stan_func_rk_vectors_lognormal")
+saveRDS(stan_rkvectors2, file = "03_Output/stan_func_rk_vectors_normal")
+
+# r & k priors (slope and k visualization testing)
+
+rk_stanslope <- stan_rslope(df = indv_gro, xf = rslopedf, temp_col = "temp", replica_col = "ord_replica", 
+                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", niterations = 1500,
+                            nchains = 2, sigma_val = 0.05, model = "02_Scripts/loglv_mod.stan", klimit = 2,
+                            kcol = "kinit", slope_col = "slope")
+
+saveRDS(rk_stanslope, file ="03_Output/rk_slope")
+
+
+
+
+
+
 
 
 
 
 # ODE check -----------------------------------------------------------------
 
-
-# CHECKING ONE BY ONE CODE (STAN VS OD SAMPLING)
-# rmean & kmean specific for each list in the outputs list 
-# change the following $0CH23_T30 for the replica you want to plot 
-
-rmean <- summary(stan_toutputs$CH23_T42)$summary["r", "mean"]
-kmean  <- summary(stan_toutputs$CH23_T42)$summary["k", "mean"]
-
-# parameters 
-parameters <- c(
-  r = rmean,
-  k = kmean
-)
-
-# times & initial z value 
-timess <- seq(0, 18, 0.1)
-init <- c(z = 0.001)
-
-
-odeCH23 <- ode(y = init, times = timess, func = logistic_eq, parms = parameters)
-plot(odeCH23[,1], odeCH23[,2], type = "l", col = "pink", lwd = 2, ylim = c(0, 2),
-     main = "Comparación Real: Datos vs Modelo (Bacillus altitudinis - 42°C)")
-
-points(individual_growth$hr[individual_growth$Cepa == "CH23" & individual_growth$temp == 42], 
-       individual_growth$OD_real[individual_growth$Cepa == "CH23" & individual_growth$temp == 42], 
-       pch = 16, col = "red4")
-
-
-
-
-
-
 # COMPARE STAN VS GROWTH CURVES
-stan_toutputs <- readRDS("03_Output/stan_func_rk_vectors")
-curvecomparison <- stanvsgw(stan_rkvectors, seq(0, 18, 0.1), 0.001, indv_gro, "hr", "Cepa", "temp", "OD_real", 
+curvecomparison <- stanvsgw(rk_stanslope, seq(0, 18, 0.1), 0.001, indv_gro, "hr", "Cepa", "temp", "OD_real", 
                             n_samples = 60)
 curvecomparison$CH29_T30
-curvecomparison$CH447_T37
+curvecomparison$CH111_T37
 curvecomparison$CH447_T42
 
+
+# GROWTH CURVES ONLY 
 real_gwtcurves <- growth_curves_func(df = indv_gro, temps = c(30,37,42), strain_col = "Cepa", temp_col = "temp",
                    samplebyh = "hr", interest_column = "OD_real", replica_col = "ord_replica")
 real_gwtcurves$CH29_T30
-real_gwtcurves$CH447_T37
-real_gwtcurves$CH447_T42
+real_gwtcurves$CH29_T37
+real_gwtcurves$CH29_T42
+
 

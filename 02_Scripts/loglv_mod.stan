@@ -23,9 +23,9 @@ data {
   vector[totalobs] y_obs;         // vector list with population measures (all of them )
   
   real<lower=0> sigma;        // specific value for sigma 
-  real rlog;                   // for the specific r prior
-  real klog;                   // for the specific k prior 
-  
+  real rin;                   // for the specific r prior
+  real kin;                   // for the specific k prior 
+  real kfin; 
   real sdk;
   real sdr;
 }
@@ -33,13 +33,13 @@ data {
 
 parameters {
   real<lower=0> r;           // r value 
-  real<lower=0> k;           // k value 
+  real<lower=kin, upper=kfin> k;           // k value 
 }
 
 model {
   // Priors
-  r ~ lognormal(log(rlog), sdr);
-  k ~ lognormal(log(klog), sdk) T[0,2];
+  r ~ lognormal(log(rin), sdr);
+  k ~ lognormal(log(kin), sdk);
 
   // Prior for the initial state based on the values
   int point = 1; 
@@ -79,3 +79,4 @@ obs_s[1] ~ normal(z0[1], sigma);
 point = point + N_s;
 }
 }
+

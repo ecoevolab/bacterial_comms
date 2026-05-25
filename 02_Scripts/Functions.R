@@ -3,8 +3,9 @@
 
 # Stan functions ---------------------------------------------------------------
 
-# 1. Stan function with the Log LV model 
-stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col, inits_list, niterations, nchains, sigma_val){
+# Stan function with the Log LV model 
+# SPECIFIC FOR THE SSE PROCEDURE 
+stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col, inits_list, niterations, nchains, sigma_val, model){
   
   # Assigning objects to specific values in the data.frame 
   
@@ -84,7 +85,108 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
       message(paste("Stan running for:", strain_name))    
       print(paste("Diagnosis Cepa -> r:", rvalin, "K:", kvalin))
       stan_output[[strain_name]] <- stan(
-        file = "02_Scripts/loglv_mod.stan",
+        file = model,
+        data = stan_data, 
+        iter = niterations,
+        chains = nchains, 
+        init = fixed_inits, 
+        refresh = 50 
+      )
+      
+    }
+  }
+  return(stan_output)
+}
+
+# STAN WITH SLOPE 
+
+stan_rslope <- function (df, xf, temp_col, replica_col, strain_col, sample_byh, interest_col, niterations, 
+                         nchains, sigma_val, model, klimit, kcol, slope_col){
+  
+  # Assigning objects to specific values in the data.frame 
+  
+  spps <- unique(df[[strain_col]])  # N. of total spps in the data.frame (for the naming of the vectors)
+  ntemps <- sort(unique(df[[temp_col]]), decreasing = FALSE) # N. of total temperatures in the data.frame 
+  
+  # list for the resulting fitting
+  stan_output <- list()
+  
+  for (m in 1:length(spps)) {
+    for (o in 1:length(ntemps)) {
+      # naming tag 
+      strain_name <- paste0(spps[m], "_T", ntemps[o])
+      
+      # TIME AND OBS VECTORS 
+      # filter the data.frame
+      df_complete <- df %>% 
+        filter(.data[[strain_col]] == spps[m], # filter each strain 
+               .data[[temp_col]] ==ntemps[o]) %>%  # filter by temp 
+        arrange(.data[[replica_col]])     # arrange by the number of replica 
+      
+      # subset/split the data.frame by replica 
+      replica_list <- split(df_complete, df_complete[[replica_col]]) 
+      
+      # TIME AND OBS VECTORS 
+      time_flat <- unlist(lapply(replica_list, function(x) x[[sample_byh]]))
+      
+      obs_flat <- unlist(lapply(replica_list, function(x) x[[interest_col]]))
+      
+      
+      # INITIAL VALUES & K LIMITS FOR STAN TO TEST
+      kvalin <- xf %>% 
+        filter(.data[[strain_col]] == spps[m], 
+               .data[[temp_col]] == ntemps[o]) %>%
+        pull(.data[[kcol]]) %>%
+        as.numeric()
+      
+      # sd for stan to test 
+      if (kvalin < 1.0) {
+        sd_k <- 0.4   
+        sd_r <- 0.3
+        
+      } else {
+        sd_k <- 0.4 
+        sd_r <- 0.5
+        
+      }
+      
+      rslope <- xf %>% 
+        filter(.data[[strain_col]] == spps[m], 
+               .data[[temp_col]] == ntemps[o]) %>%
+        pull(.data[[slope_col]]) %>%
+        as.numeric()
+      
+
+      fixed_inits <- lapply(1:nchains, function(id) {
+        list(r = rslope, k = kvalin * 1.05)
+      })
+      
+      
+      # STAN_DATA 
+      stan_data <- list(
+        S = length(replica_list), # number of replicas 
+        totalobs = length(obs_flat),  # total of observations 
+        sizes = as.array(sapply(replica_list, nrow)), # size of each replica 
+        
+        y_time = time_flat, 
+        y_obs = obs_flat, 
+        
+        sigma = sigma_val,
+        rin = rslope,
+        kin = kvalin, 
+        kfin = klimit, 
+        sdk = sd_k, 
+        sdr = sd_r
+      )
+      
+      
+      # Stan function 
+      # loglv_mod.stan -- stan function 
+      
+      message(paste("Stan running for:", strain_name, "r:", rslope, "K:", kvalin))    
+
+      stan_output[[strain_name]] <- stan(
+        file = model,
         data = stan_data, 
         iter = niterations,
         chains = nchains, 
@@ -98,7 +200,7 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
 }
 
 
-# 1.1 logistic ode 
+# logistic ode 
 
 logistic_ode <- function(t, x, parms) {
   r <- parms$r
@@ -110,7 +212,7 @@ logistic_ode <- function(t, x, parms) {
 }
 
 
-# 1.2 compare obs - pred 
+# compare obs - pred 
 compare_obs_pred <- function(r, k , Obs){
   Obs %>%
     map_dfr(function(obs,r,k){
@@ -134,7 +236,65 @@ compare_obs_pred <- function(r, k , Obs){
 }
 
 
-# 1.3 Obs filtering for r & k prior estimation 
+# To get the r slope (lm model)
+r_slope <- function(df, xf, strain_col, temp_col, x1_col, x2_col, samplebyh, interest_col) {
+  
+  # lists 
+  y_in_list  <- list()
+  y_fin_list <- list()
+  slopes_list <- list()
+  lm_models   <- list()
+  
+  # iterations specific for each strain 
+  for (i in 1:nrow(xf)) {
+    
+    current_strain <- xf[[strain_col]][i]
+    current_temp   <- xf[[temp_col]][i]
+    x1             <- xf[[x1_col]][i]
+    x2             <- xf[[x2_col]][i]
+    
+    
+    # get the max value for x1
+    y1 <- df %>% 
+      filter(.data[[strain_col]] == current_strain,
+             .data[[temp_col]] == current_temp,
+             .data[[samplebyh]] == x1) %>%
+      pull(.data[[interest_col]]) %>% 
+      max(na.rm = TRUE)
+    
+    # get the max value for x2 
+    y2 <- df %>% 
+      filter(.data[[strain_col]] == current_strain,
+             .data[[temp_col]] == current_temp,
+             .data[[samplebyh]] == x2) %>%
+      pull(.data[[interest_col]]) %>% 
+      max(na.rm = TRUE)
+    
+    # save the y1 & y2 vals 
+    y_in_list[[i]]  <- y1
+    y_fin_list[[i]] <- y2
+    
+    # lineal model for eachs strain
+    if (!is.na(y1) && !is.na(y2)) {
+      x_vals <- c(x1, x2)
+      y_vals <- c(y1, y2)
+      
+      fit <- lm(y_vals ~ x_vals)
+      
+      lm_models[[i]]   <- fit
+      slopes_list[[i]]  <- coef(fit)[2]
+      
+    }}
+  
+  # new columns to include in the data.frame 
+  xf[["yin"]]    <- y_in_list
+  xf[["yfin"]]   <- y_fin_list
+  xf[["slope"]]   <- slopes_list
+  
+  return(xf)
+}
+
+# Obs filtering for r & k prior estimation 
 rk_prior_testing <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
   
   # Assigning objects to specific values in the data.frame 
@@ -190,7 +350,7 @@ rk_prior_testing <- function (df, temp_col, replica_col, strain_col, sample_byh,
   return(list(obs = obs_filtered, grid_output = grid_results))
 }
 
-# 2. logistic growth (deSolve) / for testing stan model
+# logistic growth (deSolve) / for testing stan model
 logistic_eq <- function(t, state, parameters){
   with(as.list(c(state, parameters)), {
     dz <- r * z * (1 - z / k)
@@ -201,10 +361,10 @@ logistic_eq <- function(t, state, parameters){
 
 # Growth curves ---------------------------------------------------------------
 
-# 3. Get each growth curve (cuatro cienegas)
+# Get each growth curve (cuatro cienegas)
 growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, interest_column, replica_col){
   
-  strains <- sort(unique(df[[strain_col]]), decreasing = F)
+  strains <- unique(df[[strain_col]])
   all_curvesbyt <- list()
   tempt <- as.numeric(temps)
   
@@ -236,7 +396,7 @@ growth_curves_func <- function(df, temps, strain_col, temp_col, samplebyh, inter
 }
 
 
-# 4. Compare stan results vs the actual growth curves 
+# Compare stan results vs the actual growth curves 
 stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, temp_col, interest_col, n_samples){
   
   library(ggplot2)
@@ -314,7 +474,7 @@ stanvsgw <- function(outs, timesf, initialv, realdata, samplebyh, strain_col, te
 }
 
 
-# 5. Creates a list of matrix with every OD_real value (separated by strain and temperature)
+# Creates a list of matrix with every OD_real value (separated by strain and temperature)
 get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, interest_col){
   
   # assigning objects to specific values in the data.frame 
@@ -359,7 +519,7 @@ get_realod <- function (df, temp_col, replica_col, strain_col, sample_byh, inter
 }
 # Reconstruction methods -------------------------------------------------------
 
-# 6. Get each community abundances (separated by temperature) 
+# Get each community abundances (separated by temperature) 
 
 community_isolation <- function(rcommunities, sample, sample_col, rcommunities_col, df, arrangev, interest_column, dfwvals, composition_df){
   
@@ -423,7 +583,7 @@ community_isolation <- function(rcommunities, sample, sample_col, rcommunities_c
   
 }
 
-# 7. Sparcc for multiple commuinities  - used for algorithm testing 
+# Sparcc for multiple commuinities  - used for algorithm testing 
 sparcc_inf <- function (list_wcoms, pval){
   
   infernt <- list()
