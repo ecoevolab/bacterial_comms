@@ -33,17 +33,16 @@ outputs_normal <- readRDS("03_Output/stan_func_rk_vectors_normal")
 stan_rkvectors2 <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", 
                            inits_list = rk_valz_cc, niterations = 1500, nchains = 2, sigma_val = 0.05)
-saveRDS(stan_rkvectors2, file = "03_Output/stan_func_rk_vectors_normal")
 
 # r & k priors (slope and k visualization testing)
-
-rk_stanslope <- stan_rslope(df = indv_gro, xf = rk_slope_priors, temp_col = "temp", replica_col = "ord_replica", 
-                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", niterations = 1500,
+ 
+rk_slope_priors <- readRDS("03_Output/rkpriors_slope")
+rkmonod_stanslope <- stan_rslope(df = indv_gro, xf = rk_slope_priors, temp_col = "temp", replica_col = "ord_replica", 
+                            strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", niterations = 4000,
                             nchains = 2, sigma_val = 0.05, model = "02_Scripts/gompertz_mod.stan", klimit = 2,
                             kcol = "kinit", slope_col = "slope")
 
-saveRDS(rk_stanslope, file ="03_Output/rk_slope")
-
+saveRDS(rkmonod_stanslope, "03_Output/stan_rk_vectors_slope_monod")
 
 
 
@@ -56,9 +55,9 @@ saveRDS(rk_stanslope, file ="03_Output/rk_slope")
 # ODE check -----------------------------------------------------------------
 
 # COMPARE STAN VS GROWTH CURVES
-curvecomparison <- stanvsgw(rk_stanslope, seq(0, 18, 0.1), 0.001, indv_gro, "hr", "Cepa", "temp", "OD_real", 
+curvecomparison2 <- stanvsgw(rk_stanslope, seq(0, 18, 0.1), 0.001, indv_gro, "hr", "Cepa", "temp", "OD_real", 
                             n_samples = 60)
-curvecomparison$CH29_T30
+curvecomparison2$CH29_T30
 curvecomparison$CH111_T37
 curvecomparison$CH447_T42
 

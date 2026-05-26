@@ -159,8 +159,10 @@ stan_rslope <- function (df, xf, temp_col, replica_col, strain_col, sample_byh, 
       
 
       fixed_inits <- lapply(1:nchains, function(id) {
-
-        list(r = rslope, k = kvalin * 1.05)
+        list(
+          r = rslope, 
+          ka = 0.05,
+          yield = kvalin * 1.05)
       })
       
       
