@@ -28,16 +28,6 @@ outputs_lognormal <- readRDS("03_Output/stan_func_rk_vectors_lognormal")
 outputs_normal <- readRDS("03_Output/stan_func_rk_vectors_normal")
 
 
-# Test distribution ----------------------------------------------------------
-CH450_T47 <- indv_gro %>% 
-  filter(Cepa == "CH450", # filter each strain 
-         temp == 42) %>%  # filter by temp 
-  arrange(ord_replica) %>% 
-  pull(OD_real)
-
-descdist(CH450_T47, discrete = FALSE)
-
-
 # Pipeline -------------------------------------------------------------------
 # r & k priors from heatmap testing 
 stan_rkvectors2 <- stan_ccfunct(df = indv_gro, temp_col = "temp", replica_col = "ord_replica", 
@@ -47,9 +37,9 @@ saveRDS(stan_rkvectors2, file = "03_Output/stan_func_rk_vectors_normal")
 
 # r & k priors (slope and k visualization testing)
 
-rk_stanslope <- stan_rslope(df = indv_gro, xf = rslopedf, temp_col = "temp", replica_col = "ord_replica", 
+rk_stanslope <- stan_rslope(df = indv_gro, xf = rk_slope_priors, temp_col = "temp", replica_col = "ord_replica", 
                             strain_col = "Cepa", sample_byh = "hr", interest_col = "OD_real", niterations = 1500,
-                            nchains = 2, sigma_val = 0.05, model = "02_Scripts/loglv_mod.stan", klimit = 2,
+                            nchains = 2, sigma_val = 0.05, model = "02_Scripts/gompertz_mod.stan", klimit = 2,
                             kcol = "kinit", slope_col = "slope")
 
 saveRDS(rk_stanslope, file ="03_Output/rk_slope")

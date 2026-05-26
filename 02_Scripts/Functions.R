@@ -90,7 +90,8 @@ stan_ccfunct <- function (df, temp_col, replica_col, strain_col, sample_byh, int
         iter = niterations,
         chains = nchains, 
         init = fixed_inits, 
-        refresh = 50 
+        refresh = 50,
+        control = list(adapt_delta = 0.95)
       )
       
     }
@@ -142,11 +143,11 @@ stan_rslope <- function (df, xf, temp_col, replica_col, strain_col, sample_byh, 
       # sd for stan to test 
       if (kvalin < 1.0) {
         sd_k <- 0.4   
-        sd_r <- 0.3
+        sd_r <- 1.05
         
       } else {
         sd_k <- 0.4 
-        sd_r <- 0.5
+        sd_r <- 1.5
         
       }
       
@@ -158,6 +159,7 @@ stan_rslope <- function (df, xf, temp_col, replica_col, strain_col, sample_byh, 
       
 
       fixed_inits <- lapply(1:nchains, function(id) {
+
         list(r = rslope, k = kvalin * 1.05)
       })
       

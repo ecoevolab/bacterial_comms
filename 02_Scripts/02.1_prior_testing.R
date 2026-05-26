@@ -9,6 +9,11 @@ indv_gro <- read_tsv("01_RawData/modified_individual_strain_growth_curves_ord_re
 indv_gro <- as.data.frame(indv_gro)
 
 rslopedf <- read.csv("01_RawData/rk_slope_n_priors.csv")
+rslopedf
+
+# rk_slope_priors <- saveRDS(rslopedf, "03_Output/rk_slope_priors")
+rk_slope_priors <- readRDS("03_Output/rkpriors_slope")
+
 
 # r & k prior testing with heatmap results ---------------------------------------------------------------
 
@@ -16,7 +21,11 @@ rk_valz_cc <- rk_prior_testing(df = indv_gro, temp_col = "temp", replica_col = "
                                sample_byh = "hr", interest_col = "OD_real")
 rk_valz_cc$grid_output
 
+
+
+
+
 # r & k prior delimitation by data -------------------------------------------------------------
-rslopedf <- r_slope(df = indv_gro, xf = rk_priors_data, temp_col = "temp", strain_col = "Cepa", 
+rk_slope_priors <- r_slope(df = indv_gro, xf = rslopedf, temp_col = "temp", strain_col = "Cepa", 
                     x1_col = "xin", x2_col = "xfin",samplebyh = "hr", interest_col = "OD_real")   
-rslopedf # new data.frame with slope column / DF YOU SHOULD USE TO TEST THE INITIAL VALUES 
+# new data.frame with slope column / DF YOU SHOULD USE TO TEST THE INITIAL VALUES 

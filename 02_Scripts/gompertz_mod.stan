@@ -10,7 +10,7 @@ functions {
     
     for (j in 1:num_elements(z)) {
       
-      reañ z_safe = fmax(z[j], 1e-6) 
+      real z_safe = fmax(z[j], 1e-6);
       // in case one of the observations may be 0 because 
       // Gompertz equation uses logarithm 
       
