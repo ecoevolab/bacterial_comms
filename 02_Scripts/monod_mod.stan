@@ -2,24 +2,22 @@
 
 functions {
   vector lvfnc(real t,           // time
-               vector z,         // state: z[1] = Biomass (OD), z[2] = Substrate
-               real r,           // r value (mu_max in the original model)
-               real ka,          // affinity constant (k_s in the original model)
-               real yield) {     // (Y) 
+               vector z,         // 
+               real mumax,       // maximum growth rate of m.o 
+               real ks,          // half velocity constant = value of S when mu/mumax = 0.5 
+               real yield){      // yield coefficient --> proportion of biomass produced by the substrate consumption 
+     
     
-    vector[2] dzdt ;     // vecttor dzdt 
+    vector[2] dzdt ;     // vector dzdt 
     
+    real X = fmax(z[1], 1e-6); // X = total biomass 
+    real S = fmax(z[2], 1e-6); // Concentration of the limiting substrate 
     
-    // to avoid 0 values 
-    real X = fmax(z[1], 1e-6); // Biomass (OD)
-    real S = fmax(z[2], 1e-6); // Substrate
+    real mu = mumax * (S / (ks + S)); // mcrobial growth rate 
     
-    dzdt[1] = r * (S / (ka + S)) * X; // microbial growth 
-    dzdt[2] = - (1.0 / yield) * dzdt[1];  //substrate consumption 
+    dzdt[1] = mu * X ; // microbial growth 
+    dzdt[2] = - ((dzdt[1]) / yield );  // substrate consumption 
     
-    // note: dzdt[2] = substrate -- is going to decrease by consumption / proportional to generated biomass
-    
-    }
     return dzdt;
   }
 }
@@ -33,25 +31,25 @@ data {
   vector[totalobs] y_obs;         // vector list with population measures (all of them )
   
   real<lower=0> sigma;        // specific value for sigma 
-  real rin;                   // for the specific r prior
-  real kin;                   // for the specific k prior 
-  real kfin;                  // to the to OD value 
+  real rmumax;                // last OD value for mumax 
+  real ks_in;
+  real yield_in;
   real sdk;                   // standard deviation for k & r respectively 
   real sdr;
 }
 
 
 parameters {
-  real<lower=0> r;           // r value 
-  real<lower=0> ka;           // ka
-  real<lower=kin, upper=kfin> yield;           // yield value 
+  real<lower=0> mumax;           // r value 
+  real<lower=0> ks;           // ka
+  real<lower=0> yield;           // yield value 
 }
 
 model {
   // Priors
-  r ~ lognormal(log(rin), sdr);
-  ka ~ lognormal(log(0.05), sdk);
-  yield ~ lognormal(log(kin), sdk);
+  mumax ~ lognormal(log(rmumax), sdr);
+  ks ~ lognormal(log(ks_in), sdk);
+  yield ~ lognormal(log(yield_in), 0.5);
 
   // Prior for the initial state based on the values
   int point = 1; 
@@ -80,7 +78,7 @@ model {
     }
    
    // solve the ODE with the array 
-   array[N_sim] vector[2] z = ode_rk45(lvfnc, z0, t_start, t_array, r, ka, yield);   // solve it 
+   array[N_sim] vector[2] z = ode_bdf_tol(lvfnc, z0, t_start, t_array, 1e-4, 1e-4, 500, mumax, ks, yield);   // solve it 
    
    // likelihood 
    for (n in 1:N_sim) {

@@ -41,13 +41,13 @@ data {
 
 parameters {
   real<lower=0> r;           // r value 
-  real<lower=kin, upper=kfin> k;           // k value 
+  real<lower=0> k;           // k value 
 }
 
 model {
   // Priors
   r ~ lognormal(log(rin), sdr);
-  k ~ lognormal(log(kin), sdk);
+  k ~ lognormal(log(kin), 0.5);
 
   // Prior for the initial state based on the values
   int point = 1; 
@@ -74,7 +74,7 @@ model {
     }
    
    // solve the ODE with the array 
-array[N_sim] vector[1] z = ode_rk45(lvfnc, z0, t_start, t_array, r, k);   // solve it 
+array[N_sim] vector[1] z = ode_bdf(lvfnc, z0, t_start, t_array, r, k);   // solve it 
    
    // likelihood 
 for (n in 1:N_sim) {
