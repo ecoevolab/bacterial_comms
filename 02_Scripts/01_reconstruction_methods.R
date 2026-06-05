@@ -22,12 +22,8 @@ temps_rhiz <- c(28, 32) # without the 0 temperature, because it is already being
 # Using function 
 rz_communities <- community_isolation(rcommunities = comms_rhiz , sample = temps_rhiz , sample_col = "temp", 
                                       rcommunities_col = "community", df = metadata, arrangev = "day", 
-                                      interest_column = "label", dfwvals = f_clean, 
-                                      composition_df = rzcompositiondata)
-
-    
-rz_communities # List with all the communities and their respective composition/abundances 
-
+                                      interest_column = "label", dfwvals = f_clean, composition_df = rzcompositiondata)
+summary(rz_communities)
 ##### Testing network inference algortihms -----------------------------------------
 
 # 1. Isolate only by community (not temperature)
