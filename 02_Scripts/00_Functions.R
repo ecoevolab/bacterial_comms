@@ -661,8 +661,7 @@ community_isolation <- function(rcommunities, sample, sample_col, rcommunities_c
   for (id in seq_along(community_list)) {
     abundances_tables[[id]] <- dfwvals %>%
       dplyr::select(1 | all_of(community_list[[id]])) %>%
-      column_to_rownames(var = "row.names") # Asumming the first column belongs to the row names 
-    
+      tibble::column_to_rownames(colnames(.[1]))    
   }
   
   abnds_filtered <- list()
@@ -694,6 +693,7 @@ community_isolation <- function(rcommunities, sample, sample_col, rcommunities_c
   return(abnds_filtered)
   
 }
+
 
 # Sparcc for multiple commuinities  - used for algorithm testing 
 sparcc_inf <- function (list_wcoms, pval){
