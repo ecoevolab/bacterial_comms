@@ -10,9 +10,9 @@ library(textshape)
 install.packages("WGCNA")
 
 # Load tsv archives ----------------------------------------------------------------
-metadata <- as.data.frame(read_tsv(file = "01_RawData/metadata_clean.tsv"))
+metadata <- as.data.frame(read_tsv(file = "01_RawData/rhiz_metadata_clean.tsv"))
 metadata[is.na(metadata)] <- 0
-f_clean <- as.data.frame(read_tsv("01_RawData/f_clean.tsv"))
+f_clean <- as.data.frame(read_tsv("01_RawData/rhiz_f_clean.tsv"))
 rzcompositiondata <- read.csv("01_RawData/rzcomposition.csv")
 
 ## Community isolation -------------------------------------------------------------
@@ -23,6 +23,8 @@ temps_rhiz <- c(28, 32) # without the 0 temperature, because it is already being
 rz_communities <- community_isolation(rcommunities = comms_rhiz , sample = temps_rhiz , sample_col = "temp", 
                                       rcommunities_col = "community", df = metadata, arrangev = "day", 
                                       interest_column = "label", dfwvals = f_clean, composition_df = rzcompositiondata)
+
+rz_communities
 summary(rz_communities)
 ##### Testing network inference algortihms -----------------------------------------
 

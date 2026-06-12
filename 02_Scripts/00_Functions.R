@@ -694,7 +694,6 @@ community_isolation <- function(rcommunities, sample, sample_col, rcommunities_c
   
 }
 
-
 # Sparcc for multiple commuinities  - used for algorithm testing 
 sparcc_inf <- function (list_wcoms, pval){
   
