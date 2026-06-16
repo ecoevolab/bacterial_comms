@@ -53,10 +53,6 @@ meta_count <- meta_count %>%
   select(-day, -techrep) %>%
   left_join(syncom_growth, by = c("Community", "hrs", "exp", "temp"))
 
-
-freqsss <- freqs %>%
-  right_join(indiv_growth %>% select(OD600), by = "Strain")
-
 Freqs <- Freqs %>%
   left_join(Meta %>% select(label, OD600)) %>%
   mutate(abs1 = freq * OD600) %>%
@@ -66,10 +62,10 @@ Freqs <- Freqs %>%
 # Tibble for the CV
 
 CVP_table <- freqs %>%
-  select(Strain, label, community, freq) %>% 
+  select(Strain, label, community, count) %>% 
   pivot_wider(
     names_from = community, 
-    values_from = freq, 
+    values_from = count, 
     values_fill = 0
   )
 
@@ -103,10 +99,7 @@ for (Y_cv in commnames){
     h1_model <- lm(form_h1, data = CVP_table)
     erro_h1 <- sum(residuals(h1_model)^2) # causal_strength
     
-    erro_j <- erro_h1 - erro_h0
-    if(erro_j < 0){
-      
-    }
+    
     
     # Causal_strength 
     if(erro_h1 < erro_h0){
@@ -122,3 +115,4 @@ for (Y_cv in commnames){
 
 CVP_ftab <- bind_rows(community_CVP)
 CVP_ftab
+
